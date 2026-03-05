@@ -1,0 +1,17 @@
+server:
+  host: "0.0.0.0"
+  port: 9000
+  tls:
+    enabled: false
+    cert: ""
+    key: ""
+
+turn:
+  enabled: true
+  port: 3478
+  realm: "airmeet"
+  public_ip: ""
+
+rooms:
+  max_participants: 50
+  default_video_quality: "720p"

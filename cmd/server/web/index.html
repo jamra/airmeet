@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airmeet - Video Conference</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Join Screen -->
+        <div id="join-screen" class="screen">
+            <div class="join-container">
+                <h1>Airmeet</h1>
+                <p>Simple video conferencing</p>
+                <form id="join-form">
+                    <input type="text" id="display-name" placeholder="Your name" required autocomplete="name">
+                    <input type="text" id="room-id" placeholder="Room ID (leave empty to create new)" autocomplete="off">
+                    <button type="submit">Join Meeting</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Meeting Screen -->
+        <div id="meeting-screen" class="screen hidden">
+            <div id="video-grid"></div>
+
+            <!-- Controls -->
+            <div id="controls">
+                <button id="toggle-audio" class="control-btn" title="Toggle Audio">
+                    <span class="icon">🎤</span>
+                </button>
+                <button id="toggle-video" class="control-btn" title="Toggle Video">
+                    <span class="icon">📹</span>
+                </button>
+                <button id="toggle-screen" class="control-btn" title="Share Screen">
+                    <span class="icon">🖥️</span>
+                </button>
+                <button id="toggle-chat" class="control-btn" title="Toggle Chat">
+                    <span class="icon">💬</span>
+                </button>
+                <button id="leave-btn" class="control-btn leave" title="Leave Meeting">
+                    <span class="icon">📞</span>
+                </button>
+            </div>
+
+            <!-- Chat Panel -->
+            <div id="chat-panel" class="hidden">
+                <div id="chat-header">
+                    <span>Chat</span>
+                    <button id="close-chat">×</button>
+                </div>
+                <div id="chat-messages"></div>
+                <form id="chat-form">
+                    <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+
+            <!-- Participants List -->
+            <div id="participants-panel">
+                <div id="participants-header">
+                    <span>Participants (<span id="participant-count">0</span>)</span>
+                </div>
+                <ul id="participants-list"></ul>
+            </div>
+
+            <!-- Room Info -->
+            <div id="room-info">
+                <span id="room-id-display"></span>
+                <button id="copy-link" title="Copy invite link">📋</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
