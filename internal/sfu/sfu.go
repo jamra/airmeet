@@ -5,7 +5,7 @@ import (
 
 	"github.com/pion/webrtc/v4"
 	"github.com/rs/zerolog/log"
-	"github.com/yourname/airmeet/internal/room"
+	"github.com/jamra/airmeet/internal/room"
 )
 
 // SFU handles WebRTC connections and track forwarding

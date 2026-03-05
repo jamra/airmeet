@@ -10,9 +10,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v4"
 	"github.com/rs/zerolog/log"
-	"github.com/yourname/airmeet/internal/chat"
-	"github.com/yourname/airmeet/internal/room"
-	"github.com/yourname/airmeet/internal/sfu"
+	"github.com/jamra/airmeet/internal/chat"
+	"github.com/jamra/airmeet/internal/room"
+	"github.com/jamra/airmeet/internal/sfu"
 )
 
 var upgrader = websocket.Upgrader{

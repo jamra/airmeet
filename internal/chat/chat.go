@@ -7,7 +7,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
-	"github.com/yourname/airmeet/internal/room"
+	"github.com/jamra/airmeet/internal/room"
 )
 
 // Message represents a stored chat message

@@ -8,7 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/yourname/airmeet/internal/server"
+	"github.com/jamra/airmeet/internal/server"
 )
 
 //go:embed all:web

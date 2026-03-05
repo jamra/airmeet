@@ -14,11 +14,11 @@ import (
 
 	"github.com/pion/webrtc/v4"
 	"github.com/rs/zerolog/log"
-	"github.com/yourname/airmeet/internal/chat"
-	"github.com/yourname/airmeet/internal/room"
-	"github.com/yourname/airmeet/internal/sfu"
-	"github.com/yourname/airmeet/internal/signaling"
-	"github.com/yourname/airmeet/internal/turn"
+	"github.com/jamra/airmeet/internal/chat"
+	"github.com/jamra/airmeet/internal/room"
+	"github.com/jamra/airmeet/internal/sfu"
+	"github.com/jamra/airmeet/internal/signaling"
+	"github.com/jamra/airmeet/internal/turn"
 	"gopkg.in/yaml.v3"
 )
 

@@ -1,4 +1,4 @@
-module github.com/yourname/airmeet
+module github.com/jamra/airmeet
 
 go 1.24.0
 
