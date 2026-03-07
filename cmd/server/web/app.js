@@ -274,12 +274,13 @@ class AirmeetClient {
 
         if (enhancedNoiseCheckbox) {
             enhancedNoiseCheckbox.checked = this.audioSettings.enhancedNoiseSuppression;
-            enhancedNoiseCheckbox.addEventListener('change', (e) => {
+            enhancedNoiseCheckbox.addEventListener('change', async (e) => {
                 this.audioSettings.enhancedNoiseSuppression = e.target.checked;
                 this.audioProcessor.setEnabled(e.target.checked);
-                // Note: Enhanced noise suppression requires rejoining to take effect
-                if (this.localStream) {
-                    this.showNotification('Rejoin the meeting for enhanced noise suppression to take effect');
+
+                // Apply RNNoise live if in a call
+                if (this.localStream && this.peerConnection) {
+                    await this.applyEnhancedNoiseSuppression(e.target.checked);
                 }
             });
         }
@@ -301,6 +302,73 @@ class AirmeetClient {
             console.log('Audio constraints updated');
         } catch (err) {
             console.warn('Failed to update audio constraints:', err);
+        }
+    }
+
+    async applyEnhancedNoiseSuppression(enable) {
+        try {
+            if (enable) {
+                // Get a fresh audio stream to process
+                const rawStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        noiseSuppression: this.audioSettings.noiseSuppression,
+                        echoCancellation: this.audioSettings.echoCancellation,
+                        autoGainControl: this.audioSettings.autoGainControl
+                    }
+                });
+
+                // Process through RNNoise
+                const processedStream = await this.audioProcessor.processStream(rawStream);
+                const processedAudioTrack = processedStream.getAudioTracks()[0];
+
+                // Replace audio track in peer connection
+                const sender = this.peerConnection.getSenders()
+                    .find(s => s.track && s.track.kind === 'audio');
+                if (sender) {
+                    await sender.replaceTrack(processedAudioTrack);
+                }
+
+                // Update local stream reference
+                this.localStream.getAudioTracks().forEach(t => t.stop());
+                this.localStream.removeTrack(this.localStream.getAudioTracks()[0]);
+                this.localStream.addTrack(processedAudioTrack);
+
+                this.showNotification('AI noise suppression enabled');
+                console.log('Enhanced noise suppression enabled');
+            } else {
+                // Get fresh unprocessed audio
+                const rawStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        noiseSuppression: this.audioSettings.noiseSuppression,
+                        echoCancellation: this.audioSettings.echoCancellation,
+                        autoGainControl: this.audioSettings.autoGainControl
+                    }
+                });
+
+                const rawAudioTrack = rawStream.getAudioTracks()[0];
+
+                // Replace audio track in peer connection
+                const sender = this.peerConnection.getSenders()
+                    .find(s => s.track && s.track.kind === 'audio');
+                if (sender) {
+                    await sender.replaceTrack(rawAudioTrack);
+                }
+
+                // Update local stream reference
+                this.localStream.getAudioTracks().forEach(t => t.stop());
+                this.localStream.removeTrack(this.localStream.getAudioTracks()[0]);
+                this.localStream.addTrack(rawAudioTrack);
+
+                // Cleanup audio processor
+                this.audioProcessor.cleanup();
+                await this.audioProcessor.init();
+
+                this.showNotification('AI noise suppression disabled');
+                console.log('Enhanced noise suppression disabled');
+            }
+        } catch (err) {
+            console.error('Failed to apply enhanced noise suppression:', err);
+            this.showNotification('Failed to change noise suppression');
         }
     }
 
