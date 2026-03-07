@@ -4,23 +4,41 @@
 class AudioProcessor {
     constructor() {
         this.audioContext = null;
-        this.rnnoiseNode = null;
+        this.rnnoiseModule = null;
+        this.rnnoiseState = null;
+        this.processorNode = null;
         this.sourceNode = null;
         this.destinationNode = null;
         this.enabled = false;
         this.rnnoiseLoaded = false;
+        this.frameSize = 480; // RNNoise frame size (10ms at 48kHz)
     }
 
     async init() {
         // Load RNNoise WASM module
         try {
-            // We'll use a worklet-based approach
-            this.audioContext = new AudioContext({ sampleRate: 48000 });
+            // Dynamically load the RNNoise module
+            const script = document.createElement('script');
+            script.src = '/rnnoise-wasm.js';
+            document.head.appendChild(script);
 
-            // Load the RNNoise worklet
-            await this.audioContext.audioWorklet.addModule('/rnnoise-processor.js');
-            this.rnnoiseLoaded = true;
-            console.log('RNNoise audio processor loaded');
+            await new Promise((resolve, reject) => {
+                script.onload = resolve;
+                script.onerror = reject;
+            });
+
+            // Initialize the WASM module
+            if (typeof createRNNWasmModule === 'function') {
+                this.rnnoiseModule = await createRNNWasmModule({
+                    locateFile: (path) => '/' + path
+                });
+                await this.rnnoiseModule.ready;
+
+                // Create RNNoise state
+                this.rnnoiseState = this.rnnoiseModule._rnnoise_create();
+                this.rnnoiseLoaded = true;
+                console.log('RNNoise WASM loaded successfully');
+            }
         } catch (err) {
             console.warn('RNNoise not available, using browser defaults:', err);
             this.rnnoiseLoaded = false;
@@ -37,18 +55,57 @@ class AudioProcessor {
             const audioTrack = stream.getAudioTracks()[0];
             if (!audioTrack) return stream;
 
+            // Create audio context at 48kHz (required by RNNoise)
+            this.audioContext = new AudioContext({ sampleRate: 48000 });
+
             // Create source from stream
             this.sourceNode = this.audioContext.createMediaStreamSource(stream);
 
-            // Create RNNoise worklet node
-            this.rnnoiseNode = new AudioWorkletNode(this.audioContext, 'rnnoise-processor');
+            // Create script processor (buffer size must accommodate 480-sample frames)
+            // Using 4096 for stability, will process in 480-sample chunks
+            this.processorNode = this.audioContext.createScriptProcessor(4096, 1, 1);
+
+            // Allocate WASM memory for audio processing
+            const inputPtr = this.rnnoiseModule._malloc(this.frameSize * 4);
+            const outputPtr = this.rnnoiseModule._malloc(this.frameSize * 4);
+
+            // Process audio through RNNoise
+            this.processorNode.onaudioprocess = (e) => {
+                const input = e.inputBuffer.getChannelData(0);
+                const output = e.outputBuffer.getChannelData(0);
+
+                // Process in 480-sample chunks
+                for (let i = 0; i < input.length; i += this.frameSize) {
+                    const chunkSize = Math.min(this.frameSize, input.length - i);
+
+                    // Copy input to WASM memory (convert to int16 range that RNNoise expects)
+                    for (let j = 0; j < chunkSize; j++) {
+                        this.rnnoiseModule.HEAPF32[(inputPtr >> 2) + j] = input[i + j] * 32768;
+                    }
+
+                    // Process through RNNoise
+                    this.rnnoiseModule._rnnoise_process_frame(
+                        this.rnnoiseState,
+                        outputPtr,
+                        inputPtr
+                    );
+
+                    // Copy output from WASM memory (convert back from int16 range)
+                    for (let j = 0; j < chunkSize; j++) {
+                        output[i + j] = this.rnnoiseModule.HEAPF32[(outputPtr >> 2) + j] / 32768;
+                    }
+                }
+            };
 
             // Create destination
             this.destinationNode = this.audioContext.createMediaStreamDestination();
 
-            // Connect: source -> rnnoise -> destination
-            this.sourceNode.connect(this.rnnoiseNode);
-            this.rnnoiseNode.connect(this.destinationNode);
+            // Connect: source -> processor -> destination
+            this.sourceNode.connect(this.processorNode);
+            this.processorNode.connect(this.destinationNode);
+
+            // Also connect to audio context destination to keep it running
+            this.processorNode.connect(this.audioContext.destination);
 
             // Create new stream with processed audio + original video
             const processedStream = new MediaStream();
@@ -79,8 +136,11 @@ class AudioProcessor {
         if (this.sourceNode) {
             this.sourceNode.disconnect();
         }
-        if (this.rnnoiseNode) {
-            this.rnnoiseNode.disconnect();
+        if (this.processorNode) {
+            this.processorNode.disconnect();
+        }
+        if (this.rnnoiseState && this.rnnoiseModule) {
+            this.rnnoiseModule._rnnoise_destroy(this.rnnoiseState);
         }
         if (this.audioContext) {
             this.audioContext.close();
