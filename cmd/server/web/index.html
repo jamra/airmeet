@@ -39,9 +39,40 @@
                 <button id="toggle-chat" class="control-btn" title="Toggle Chat">
                     <span class="icon">💬</span>
                 </button>
+                <button id="toggle-settings" class="control-btn" title="Audio Settings">
+                    <span class="icon">⚙️</span>
+                </button>
                 <button id="leave-btn" class="control-btn leave" title="Leave Meeting">
                     <span class="icon">📞</span>
                 </button>
+            </div>
+
+            <!-- Settings Panel -->
+            <div id="settings-panel" class="hidden">
+                <div id="settings-header">
+                    <span>Audio Settings</span>
+                    <button id="close-settings">×</button>
+                </div>
+                <div id="settings-content">
+                    <label class="setting-item">
+                        <input type="checkbox" id="noise-suppression" checked>
+                        <span>Noise suppression</span>
+                    </label>
+                    <label class="setting-item">
+                        <input type="checkbox" id="echo-cancellation" checked>
+                        <span>Echo cancellation</span>
+                    </label>
+                    <label class="setting-item">
+                        <input type="checkbox" id="auto-gain" checked>
+                        <span>Auto gain control</span>
+                    </label>
+                    <hr>
+                    <label class="setting-item enhanced">
+                        <input type="checkbox" id="enhanced-noise">
+                        <span>AI noise suppression (RNNoise)</span>
+                        <small>Removes keyboard, fans, background noise</small>
+                    </label>
+                </div>
             </div>
 
             <!-- Chat Panel -->

@@ -1,5 +1,93 @@
 // Airmeet WebRTC Client
 
+// Audio Processor using RNNoise for ML-based noise suppression
+class AudioProcessor {
+    constructor() {
+        this.audioContext = null;
+        this.rnnoiseNode = null;
+        this.sourceNode = null;
+        this.destinationNode = null;
+        this.enabled = false;
+        this.rnnoiseLoaded = false;
+    }
+
+    async init() {
+        // Load RNNoise WASM module
+        try {
+            // We'll use a worklet-based approach
+            this.audioContext = new AudioContext({ sampleRate: 48000 });
+
+            // Load the RNNoise worklet
+            await this.audioContext.audioWorklet.addModule('/rnnoise-processor.js');
+            this.rnnoiseLoaded = true;
+            console.log('RNNoise audio processor loaded');
+        } catch (err) {
+            console.warn('RNNoise not available, using browser defaults:', err);
+            this.rnnoiseLoaded = false;
+        }
+    }
+
+    async processStream(stream) {
+        if (!this.rnnoiseLoaded || !this.enabled) {
+            return stream;
+        }
+
+        try {
+            // Get audio track
+            const audioTrack = stream.getAudioTracks()[0];
+            if (!audioTrack) return stream;
+
+            // Create source from stream
+            this.sourceNode = this.audioContext.createMediaStreamSource(stream);
+
+            // Create RNNoise worklet node
+            this.rnnoiseNode = new AudioWorkletNode(this.audioContext, 'rnnoise-processor');
+
+            // Create destination
+            this.destinationNode = this.audioContext.createMediaStreamDestination();
+
+            // Connect: source -> rnnoise -> destination
+            this.sourceNode.connect(this.rnnoiseNode);
+            this.rnnoiseNode.connect(this.destinationNode);
+
+            // Create new stream with processed audio + original video
+            const processedStream = new MediaStream();
+
+            // Add processed audio track
+            this.destinationNode.stream.getAudioTracks().forEach(track => {
+                processedStream.addTrack(track);
+            });
+
+            // Add original video tracks
+            stream.getVideoTracks().forEach(track => {
+                processedStream.addTrack(track);
+            });
+
+            console.log('Audio processing enabled with RNNoise');
+            return processedStream;
+        } catch (err) {
+            console.error('Failed to setup audio processing:', err);
+            return stream;
+        }
+    }
+
+    setEnabled(enabled) {
+        this.enabled = enabled;
+    }
+
+    cleanup() {
+        if (this.sourceNode) {
+            this.sourceNode.disconnect();
+        }
+        if (this.rnnoiseNode) {
+            this.rnnoiseNode.disconnect();
+        }
+        if (this.audioContext) {
+            this.audioContext.close();
+        }
+    }
+}
+
 class AirmeetClient {
     constructor() {
         this.ws = null;
@@ -18,6 +106,18 @@ class AirmeetClient {
         this.videoEnabled = true;
         this.screenSharing = false;
         this.chatOpen = false;
+        this.settingsOpen = false;
+
+        // Audio settings
+        this.audioSettings = {
+            noiseSuppression: true,
+            echoCancellation: true,
+            autoGainControl: true,
+            enhancedNoiseSuppression: false  // RNNoise
+        };
+
+        // Audio processor for RNNoise
+        this.audioProcessor = new AudioProcessor();
 
         this.init();
     }
@@ -43,9 +143,12 @@ class AirmeetClient {
         this.toggleVideoBtn = document.getElementById('toggle-video');
         this.toggleScreenBtn = document.getElementById('toggle-screen');
         this.toggleChatBtn = document.getElementById('toggle-chat');
+        this.toggleSettingsBtn = document.getElementById('toggle-settings');
         this.leaveBtn = document.getElementById('leave-btn');
         this.copyLinkBtn = document.getElementById('copy-link');
         this.closeChatBtn = document.getElementById('close-chat');
+        this.closeSettingsBtn = document.getElementById('close-settings');
+        this.settingsPanel = document.getElementById('settings-panel');
 
         // Event listeners
         this.joinForm.addEventListener('submit', (e) => this.handleJoin(e));
@@ -54,9 +157,14 @@ class AirmeetClient {
         this.toggleVideoBtn.addEventListener('click', () => this.toggleVideo());
         this.toggleScreenBtn.addEventListener('click', () => this.toggleScreenShare());
         this.toggleChatBtn.addEventListener('click', () => this.toggleChat());
+        this.toggleSettingsBtn.addEventListener('click', () => this.toggleSettings());
         this.leaveBtn.addEventListener('click', () => this.leave());
         this.copyLinkBtn.addEventListener('click', () => this.copyInviteLink());
         this.closeChatBtn.addEventListener('click', () => this.toggleChat());
+        this.closeSettingsBtn.addEventListener('click', () => this.toggleSettings());
+
+        // Audio settings listeners
+        this.setupAudioSettingsListeners();
 
         // Check URL for room ID and password
         const urlParams = new URLSearchParams(window.location.search);
@@ -69,6 +177,86 @@ class AirmeetClient {
 
         // Fetch ICE servers
         this.fetchICEServers();
+
+        // Initialize audio processor
+        this.audioProcessor.init();
+    }
+
+    setupAudioSettingsListeners() {
+        const noiseSuppressionCheckbox = document.getElementById('noise-suppression');
+        const echoCancellationCheckbox = document.getElementById('echo-cancellation');
+        const autoGainCheckbox = document.getElementById('auto-gain');
+        const enhancedNoiseCheckbox = document.getElementById('enhanced-noise');
+
+        if (noiseSuppressionCheckbox) {
+            noiseSuppressionCheckbox.checked = this.audioSettings.noiseSuppression;
+            noiseSuppressionCheckbox.addEventListener('change', (e) => {
+                this.audioSettings.noiseSuppression = e.target.checked;
+                this.updateAudioConstraints();
+            });
+        }
+
+        if (echoCancellationCheckbox) {
+            echoCancellationCheckbox.checked = this.audioSettings.echoCancellation;
+            echoCancellationCheckbox.addEventListener('change', (e) => {
+                this.audioSettings.echoCancellation = e.target.checked;
+                this.updateAudioConstraints();
+            });
+        }
+
+        if (autoGainCheckbox) {
+            autoGainCheckbox.checked = this.audioSettings.autoGainControl;
+            autoGainCheckbox.addEventListener('change', (e) => {
+                this.audioSettings.autoGainControl = e.target.checked;
+                this.updateAudioConstraints();
+            });
+        }
+
+        if (enhancedNoiseCheckbox) {
+            enhancedNoiseCheckbox.checked = this.audioSettings.enhancedNoiseSuppression;
+            enhancedNoiseCheckbox.addEventListener('change', (e) => {
+                this.audioSettings.enhancedNoiseSuppression = e.target.checked;
+                this.audioProcessor.setEnabled(e.target.checked);
+                // Note: Enhanced noise suppression requires rejoining to take effect
+                if (this.localStream) {
+                    this.showNotification('Rejoin the meeting for enhanced noise suppression to take effect');
+                }
+            });
+        }
+    }
+
+    async updateAudioConstraints() {
+        if (!this.localStream) return;
+
+        // Get current audio track
+        const audioTrack = this.localStream.getAudioTracks()[0];
+        if (!audioTrack) return;
+
+        try {
+            await audioTrack.applyConstraints({
+                noiseSuppression: this.audioSettings.noiseSuppression,
+                echoCancellation: this.audioSettings.echoCancellation,
+                autoGainControl: this.audioSettings.autoGainControl
+            });
+            console.log('Audio constraints updated');
+        } catch (err) {
+            console.warn('Failed to update audio constraints:', err);
+        }
+    }
+
+    showNotification(message) {
+        // Simple notification - could be enhanced with a toast UI
+        const notification = document.createElement('div');
+        notification.className = 'notification';
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+    }
+
+    toggleSettings() {
+        this.settingsOpen = !this.settingsOpen;
+        this.settingsPanel.classList.toggle('hidden', !this.settingsOpen);
+        this.toggleSettingsBtn.classList.toggle('active', this.settingsOpen);
     }
 
     async fetchICEServers() {
@@ -106,12 +294,23 @@ class AirmeetClient {
             }
         }
 
-        // Get local media stream
+        // Get local media stream with audio processing
         try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
+            const rawStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
-                audio: true
+                audio: {
+                    noiseSuppression: this.audioSettings.noiseSuppression,
+                    echoCancellation: this.audioSettings.echoCancellation,
+                    autoGainControl: this.audioSettings.autoGainControl
+                }
             });
+
+            // Apply enhanced noise suppression if enabled
+            if (this.audioSettings.enhancedNoiseSuppression) {
+                this.localStream = await this.audioProcessor.processStream(rawStream);
+            } else {
+                this.localStream = rawStream;
+            }
         } catch (err) {
             console.error('Failed to get media:', err);
             alert('Failed to access camera/microphone. Please check permissions.');
@@ -588,6 +787,9 @@ class AirmeetClient {
         if (this.ws) {
             this.ws.close();
         }
+
+        // Cleanup audio processor
+        this.audioProcessor.cleanup();
 
         // Reset state
         this.peers.clear();

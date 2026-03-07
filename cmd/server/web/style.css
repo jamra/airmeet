@@ -397,3 +397,136 @@ body {
 #video-grid.many-videos {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 }
+
+/* Settings Panel */
+#settings-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 80px;
+    width: 320px;
+    background: #16213e;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #333;
+    z-index: 100;
+}
+
+#settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #333;
+    font-weight: 600;
+}
+
+#settings-header button {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+#settings-content {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+#settings-content hr {
+    border: none;
+    border-top: 1px solid #333;
+    margin: 0.5rem 0;
+}
+
+.setting-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.setting-item:hover {
+    background: #1a1a2e;
+}
+
+.setting-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    accent-color: #667eea;
+}
+
+.setting-item span {
+    flex: 1;
+}
+
+.setting-item small {
+    display: block;
+    color: #888;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.setting-item.enhanced {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.setting-item.enhanced > span {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.setting-item.enhanced input {
+    flex-shrink: 0;
+}
+
+/* Notification */
+.notification {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #667eea;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    z-index: 200;
+    animation: slideUp 0.3s ease, fadeOut 0.3s ease 2.7s;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateX(-50%) translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+/* Responsive settings */
+@media (max-width: 768px) {
+    #settings-panel {
+        width: 100%;
+        left: 0;
+    }
+}
