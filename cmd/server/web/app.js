@@ -313,6 +313,46 @@ class AirmeetClient {
         setTimeout(() => notification.remove(), 3000);
     }
 
+    showInviteLinkDialog() {
+        const inviteUrl = `${window.location.origin}?room=${this.roomId}&pwd=${this.password}`;
+
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `
+            <div class="modal">
+                <h3>Share this link to invite others</h3>
+                <div class="invite-link-container">
+                    <input type="text" readonly value="${inviteUrl}" class="invite-link-input">
+                    <button class="copy-btn">Copy</button>
+                </div>
+                <p class="invite-note">Others need this link to join. The room is password-protected.</p>
+                <button class="close-modal-btn">Got it</button>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Copy button handler
+        const copyBtn = overlay.querySelector('.copy-btn');
+        const input = overlay.querySelector('.invite-link-input');
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(inviteUrl).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => copyBtn.textContent = 'Copy', 2000);
+            });
+        });
+
+        // Close button handler
+        const closeBtn = overlay.querySelector('.close-modal-btn');
+        closeBtn.addEventListener('click', () => {
+            overlay.remove();
+        });
+
+        // Select input text on focus
+        input.addEventListener('focus', () => input.select());
+    }
+
     toggleSettings() {
         this.settingsOpen = !this.settingsOpen;
         this.settingsPanel.classList.toggle('hidden', !this.settingsOpen);
@@ -465,6 +505,11 @@ class AirmeetClient {
 
         // Display room ID and host status
         this.roomIdDisplay.textContent = `Room: ${this.roomId}${this.isHost ? ' (Host)' : ''}`;
+
+        // Show invite link dialog for host
+        if (this.isHost && this.password) {
+            this.showInviteLinkDialog();
+        }
 
         // Add local video
         this.addLocalVideo();
