@@ -2,6 +2,7 @@ package room
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"sync"
 )
@@ -21,7 +22,20 @@ func NewManager(maxParticipants int) *Manager {
 	}
 }
 
+// CreateRoom creates a new room with an auto-generated password
+func (m *Manager) CreateRoom() *Room {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	roomID := m.generateRoomID()
+	password := m.generatePassword()
+	room := NewRoom(roomID, password, m.maxParticipants)
+	m.rooms[roomID] = room
+	return room
+}
+
 // GetOrCreateRoom gets an existing room or creates a new one
+// Deprecated: Use CreateRoom for new rooms with passwords
 func (m *Manager) GetOrCreateRoom(roomID string) *Room {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -30,7 +44,8 @@ func (m *Manager) GetOrCreateRoom(roomID string) *Room {
 		return room
 	}
 
-	room := NewRoom(roomID, m.maxParticipants)
+	password := m.generatePassword()
+	room := NewRoom(roomID, password, m.maxParticipants)
 	m.rooms[roomID] = room
 	return room
 }
@@ -68,9 +83,21 @@ func (m *Manager) RemoveRoomIfEmpty(roomID string) bool {
 
 // GenerateRoomID generates a unique room ID
 func (m *Manager) GenerateRoomID() string {
+	return m.generateRoomID()
+}
+
+// generateRoomID generates a unique room ID (internal)
+func (m *Manager) generateRoomID() string {
 	bytes := make([]byte, 6)
 	rand.Read(bytes)
 	return hex.EncodeToString(bytes)
+}
+
+// generatePassword generates a secure random password
+func (m *Manager) generatePassword() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return base64.URLEncoding.EncodeToString(bytes)
 }
 
 // ListRooms returns all active rooms

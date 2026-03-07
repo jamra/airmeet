@@ -8,7 +8,9 @@ class AirmeetClient {
         this.screenStream = null;
         this.peerId = null;
         this.roomId = null;
+        this.password = null;
         this.displayName = null;
+        this.isHost = false;
         this.peers = new Map(); // peerId -> { displayName, videoElement }
         this.iceServers = [];
 
@@ -56,11 +58,13 @@ class AirmeetClient {
         this.copyLinkBtn.addEventListener('click', () => this.copyInviteLink());
         this.closeChatBtn.addEventListener('click', () => this.toggleChat());
 
-        // Check URL for room ID
+        // Check URL for room ID and password
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
+        const pwdFromUrl = urlParams.get('pwd');
         if (roomFromUrl) {
             this.roomIdInput.value = roomFromUrl;
+            this.password = pwdFromUrl;
         }
 
         // Fetch ICE servers
@@ -94,6 +98,7 @@ class AirmeetClient {
                 const response = await fetch('/api/room/create', { method: 'POST' });
                 const data = await response.json();
                 this.roomId = data.roomId;
+                this.password = data.password;
             } catch (err) {
                 console.error('Failed to create room:', err);
                 alert('Failed to create room');
@@ -128,6 +133,7 @@ class AirmeetClient {
             this.sendMessage({
                 type: 'join',
                 roomId: this.roomId,
+                password: this.password || '',
                 displayName: this.displayName
             });
         };
@@ -180,18 +186,26 @@ class AirmeetClient {
 
     async handleJoined(message) {
         this.peerId = message.peerId;
+        this.roomId = message.roomId;
+        this.isHost = message.isHost;
+
+        // Store password if host (for invite link)
+        if (message.password) {
+            this.password = message.password;
+        }
 
         // Show meeting screen
         this.joinScreen.classList.add('hidden');
         this.meetingScreen.classList.remove('hidden');
 
-        // Update URL with room ID
+        // Update URL (without password for security)
         const url = new URL(window.location);
         url.searchParams.set('room', this.roomId);
+        url.searchParams.delete('pwd');
         window.history.replaceState({}, '', url);
 
-        // Display room ID
-        this.roomIdDisplay.textContent = `Room: ${this.roomId}`;
+        // Display room ID and host status
+        this.roomIdDisplay.textContent = `Room: ${this.roomId}${this.isHost ? ' (Host)' : ''}`;
 
         // Add local video
         this.addLocalVideo();
@@ -588,7 +602,11 @@ class AirmeetClient {
     }
 
     copyInviteLink() {
-        const url = `${window.location.origin}?room=${this.roomId}`;
+        if (!this.password) {
+            alert('Only the host can share the invite link');
+            return;
+        }
+        const url = `${window.location.origin}?room=${this.roomId}&pwd=${this.password}`;
         navigator.clipboard.writeText(url).then(() => {
             alert('Invite link copied to clipboard!');
         }).catch(() => {

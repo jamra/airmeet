@@ -25,14 +25,18 @@ type BaseMessage struct {
 type JoinMessage struct {
 	Type        string `json:"type"`
 	RoomID      string `json:"roomId"`
+	Password    string `json:"password"`
 	DisplayName string `json:"displayName"`
 }
 
 // JoinedMessage - server confirms join with peer info
 type JoinedMessage struct {
-	Type   string     `json:"type"`
-	PeerID string     `json:"peerId"`
-	Peers  []PeerInfo `json:"peers"`
+	Type     string     `json:"type"`
+	PeerID   string     `json:"peerId"`
+	RoomID   string     `json:"roomId"`
+	Password string     `json:"password,omitempty"` // only sent to host
+	IsHost   bool       `json:"isHost"`
+	Peers    []PeerInfo `json:"peers"`
 }
 
 // PeerInfo contains basic peer information

@@ -229,12 +229,12 @@ func (s *Server) handleCreateRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	roomID := s.roomManager.GenerateRoomID()
-	s.roomManager.GetOrCreateRoom(roomID)
+	room := s.roomManager.CreateRoom()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"roomId": roomID,
+		"roomId":   room.ID,
+		"password": room.GetPassword(),
 	})
 }
 

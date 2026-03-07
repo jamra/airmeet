@@ -111,11 +111,27 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleJoin processes a join request
 func (h *Handler) handleJoin(conn *websocket.Conn, peerID string, msg *JoinMessage) (*room.Peer, *room.Room) {
+	// Check if room exists
+	r := h.roomManager.GetRoom(msg.RoomID)
+	isNewRoom := r == nil
+
+	if isNewRoom {
+		// Create new room
+		r = h.roomManager.GetOrCreateRoom(msg.RoomID)
+	} else {
+		// Validate password for existing room
+		if !r.ValidatePassword(msg.Password) {
+			log.Warn().
+				Str("roomId", msg.RoomID).
+				Str("peerId", peerID).
+				Msg("Invalid password attempt")
+			h.sendError(conn, "Invalid password")
+			return nil, nil
+		}
+	}
+
 	// Create peer
 	peer := room.NewPeer(peerID, msg.DisplayName, conn)
-
-	// Get or create room
-	r := h.roomManager.GetOrCreateRoom(msg.RoomID)
 
 	// Check room capacity
 	if !r.AddPeer(peer) {
@@ -123,10 +139,20 @@ func (h *Handler) handleJoin(conn *websocket.Conn, peerID string, msg *JoinMessa
 		return nil, nil
 	}
 
+	// Set host if first joiner
+	isHost := false
+	if r.PeerCount() == 1 {
+		r.SetHost(peerID)
+		isHost = true
+	} else {
+		isHost = r.IsHost(peerID)
+	}
+
 	log.Info().
 		Str("peerId", peerID).
 		Str("roomId", msg.RoomID).
 		Str("displayName", msg.DisplayName).
+		Bool("isHost", isHost).
 		Msg("Peer joined room")
 
 	// Create peer connection
@@ -151,8 +177,16 @@ func (h *Handler) handleJoin(conn *websocket.Conn, peerID string, msg *JoinMessa
 	joinedMsg := JoinedMessage{
 		Type:   TypeJoined,
 		PeerID: peerID,
+		RoomID: r.ID,
+		IsHost: isHost,
 		Peers:  existingPeers,
 	}
+
+	// Only send password to host so they can share the invite link
+	if isHost {
+		joinedMsg.Password = r.GetPassword()
+	}
+
 	h.sendJSON(conn, joinedMsg)
 
 	// Notify other peers

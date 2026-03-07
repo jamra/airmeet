@@ -69,15 +69,18 @@ func (p *Peer) GetTracks() map[string]*webrtc.TrackLocalStaticRTP {
 // Room represents a video conference room
 type Room struct {
 	ID              string
+	Password        string
+	HostPeerID      string
 	Peers           map[string]*Peer
 	MaxParticipants int
 	mu              sync.RWMutex
 }
 
 // NewRoom creates a new room
-func NewRoom(id string, maxParticipants int) *Room {
+func NewRoom(id, password string, maxParticipants int) *Room {
 	return &Room{
 		ID:              id,
+		Password:        password,
 		Peers:           make(map[string]*Peer),
 		MaxParticipants: maxParticipants,
 	}
@@ -155,4 +158,34 @@ func (r *Room) PeerCount() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.Peers)
+}
+
+// ValidatePassword checks if the provided password matches
+func (r *Room) ValidatePassword(password string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.Password == password
+}
+
+// SetHost sets the host peer ID
+func (r *Room) SetHost(peerID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.HostPeerID == "" {
+		r.HostPeerID = peerID
+	}
+}
+
+// IsHost checks if the peer is the host
+func (r *Room) IsHost(peerID string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.HostPeerID == peerID
+}
+
+// GetPassword returns the room password
+func (r *Room) GetPassword() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.Password
 }
